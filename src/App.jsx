@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
@@ -97,7 +98,7 @@ function SettingsPage({settings,saveSettings,exportData,onClose}){
     </div>
   );
   return (
-    <div style={{position:"fixed",inset:0,background:S.bg,zIndex:300,fontFamily:"system-ui,sans-serif",color:"#F1F5F9",maxWidth:520,margin:"0 auto",overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:S.bg,zIndex:300,fontFamily:"system-ui,sans-serif",color:"#F1F5F9",maxWidth:520,margin:"0 auto",overflowY:"auto",paddingTop:"env(safe-area-inset-top)",paddingBottom:"env(safe-area-inset-bottom)"}}>
       <div style={{padding:"18px 16px 10px",borderBottom:`1px solid ${S.border}`,display:"flex",alignItems:"center",gap:12,background:"#0F172A",position:"sticky",top:0}}>
         <button onClick={onClose} style={{background:S.card,border:`1px solid ${S.border}`,color:"white",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:14}}>‹</button>
         <div style={{fontSize:17,fontWeight:700}}>Instellingen</div>
