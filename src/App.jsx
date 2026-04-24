@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
-// localStorage helper (replaces Claude's window.storage)
 const storage = {
   get: async key => { try { const v=localStorage.getItem(key); return v!==null?{value:v}:null; } catch { return null; } },
   set: async (key,val) => { try { localStorage.setItem(key,val); } catch {} }
@@ -361,7 +360,7 @@ export default function App(){
   const tabs=[{id:"training",l:"🏋️ Training"},{id:"gezondheid",l:"❤️ Gezondheid"},{id:"checklijst",l:"✅ Checklijst"},{id:"stats",l:"📈 Stats"}];
 
   return (
-    <div style={{background:S.bg,minHeight:"100vh",fontFamily:"system-ui,sans-serif",color:"#F1F5F9",maxWidth:520,margin:"0 auto"}}>
+    <div style={{background:S.bg,minHeight:"100vh",fontFamily:"system-ui,sans-serif",color:"#F1F5F9",maxWidth:520,margin:"0 auto",paddingTop:"env(safe-area-inset-top)",paddingBottom:"env(safe-area-inset-bottom)"}}>
       {showSettings&&<SettingsPage settings={settings} saveSettings={saveSettings} exportData={{logs,moved,goals,settings,checkItems,weights,startWeight}} onClose={()=>setShowSettings(false)}/>}
       <div style={{background:"#0F172A",padding:"18px 16px 10px",borderBottom:`1px solid ${S.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div><div style={{fontSize:20,fontWeight:700}}>🏅 Triathlon Tracker</div><div style={{fontSize:12,color:S.sub,marginTop:3}}>Olympisch • 26 september 2026</div></div>
@@ -374,7 +373,7 @@ export default function App(){
         {tab==="training"   && <TrainingTab {...{daysLeft,allLogs,sched,logs,todayStr,curWeek,setLogModal,prNotif,setPrNotif,checkItems,settings,schemaWeek,setSchemaWeek,setMoveModal,today}}/>}
         {tab==="gezondheid" && <GezondheidTab {...{weights,saveWeights,startWeight,saveStartWeight,logs}}/>}
         {tab==="checklijst" && <ChecklijstTab items={checkItems} saveItems={saveCheckItems}/>}
-        {tab==="stats"      && <Stats {...{logs,allLogs,goals,saveGoals,weights}}/>}
+        {tab==="stats"      && <Stats {...{logs,allLogs,goals,saveGoals,weights,saveLogs,saveWeights}}/>}
       </div>
       {logModal  && <LogModal  date={logModal.date} training={logModal.training} existing={logs[logModal.date]?.find(l=>l.type===logModal.training.type)} onSave={handleSave} onClose={()=>setLogModal(null)}/>}
       {moveModal && <MoveModal date={moveModal.date} training={moveModal.training} sched={sched} onMove={async nd=>{await saveMoved({...moved,[moveModal.date]:nd});setMoveModal(null);}} onClose={()=>setMoveModal(null)}/>}
@@ -496,10 +495,10 @@ function Schema({sched,logs,schemaWeek,setSchemaWeek,setLogModal,setMoveModal,to
   );
 }
 
-function Stats({logs,allLogs,goals,saveGoals,weights}){
+function Stats({logs,allLogs,goals,saveGoals,weights,saveLogs,saveWeights}){
   const [view,setView]=useState("stats");
   if(view==="goals")   return <GoalsPage goals={goals} saveGoals={saveGoals} onBack={()=>setView("stats")}/>;
-  if(view==="logboek") return <Logboek logs={logs} weights={weights} onBack={()=>setView("stats")}/>;
+  if(view==="logboek") return <Logboek logs={logs} weights={weights} saveLogs={saveLogs} saveWeights={saveWeights} onBack={()=>setView("stats")}/>;
   const tt={contentStyle:{background:S.card,border:"none",color:"white",fontSize:11}};
   const xa={tick:{fill:"#64748B",fontSize:9}};
   const ya={tick:{fill:"#64748B",fontSize:9},width:32};
@@ -548,10 +547,18 @@ function GoalsPage({goals,saveGoals,onBack}){
   );
 }
 
-function Logboek({logs,weights,onBack}){
+function Logboek({logs,weights,saveLogs,saveWeights,onBack}){
   const touchY=useRef(null);
   const onTS=e=>{touchY.current=e.touches[0].clientY;};
   const onTE=e=>{if(touchY.current!==null&&e.changedTouches[0].clientY-touchY.current>60)onBack();touchY.current=null;};
+
+  const deleteTraining=async(d)=>{
+    const nl={...logs}; delete nl[d]; await saveLogs(nl);
+  };
+  const deleteWeight=async(d)=>{
+    await saveWeights(weights.filter(w=>w.d!==d));
+  };
+
   const trainEntries=Object.entries(logs).flatMap(([d,arr])=>arr.map(e=>({...e,d,kind:"training"})));
   const weightEntries=weights.map(w=>({...w,kind:"weight"}));
   const all=[...trainEntries,...weightEntries].sort((a,b)=>b.d.localeCompare(a.d)).slice(0,100);
@@ -561,8 +568,28 @@ function Logboek({logs,weights,onBack}){
       {!all.length&&<div style={{textAlign:"center",color:S.muted,padding:"40px 0"}}><div style={{fontSize:36,marginBottom:10}}>🏁</div><div>Nog geen activiteiten gelogd.</div></div>}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {all.map((e,i)=>{
-          if(e.kind==="weight") return <div key={`w${i}`} style={{background:S.card,borderRadius:12,padding:14,border:"1px solid #3B82F633"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:18}}>⚖️</span><div><div style={{fontWeight:600,fontSize:13}}>Gewicht gelogd</div><div style={{fontSize:11,color:S.sub}}>{new Date(e.d+"T00:00:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"})}</div></div></div><div style={{color:"#3B82F6",fontWeight:700,fontSize:16}}>{e.kg} kg</div></div></div>;
-          return <div key={`t${i}`} style={{background:S.card,borderRadius:12,padding:14,border:`1px solid ${C[e.type]||"#334155"}33`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:18}}>{IC[e.type]}</span><div><div style={{fontWeight:600,fontSize:13}}>{LB[e.type]}</div><div style={{fontSize:11,color:S.sub}}>{new Date(e.d+"T00:00:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"})}</div></div></div><div style={{textAlign:"right"}}><div style={{color:C[e.type]||"white",fontWeight:700}}>{e.dist} {e.unit}</div><div style={{fontSize:11,color:S.sub}}>{e.time} min{e.type==="swim"?` · ${e.outdoor?"🌊 Open water":"🏊 Binnenbad"}`:""}</div></div></div></div>;
+          if(e.kind==="weight") return (
+            <div key={`w${i}`} style={{background:S.card,borderRadius:12,padding:14,border:"1px solid #3B82F633"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:18}}>⚖️</span><div><div style={{fontWeight:600,fontSize:13}}>Gewicht gelogd</div><div style={{fontSize:11,color:S.sub}}>{new Date(e.d+"T00:00:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"})}</div></div></div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{color:"#3B82F6",fontWeight:700,fontSize:16}}>{e.kg} kg</div>
+                  <button onClick={()=>deleteWeight(e.d)} style={{background:"#EF444422",border:"1px solid #EF4444",borderRadius:6,padding:"4px 8px",color:"#EF4444",cursor:"pointer",fontSize:11}}>✕</button>
+                </div>
+              </div>
+            </div>
+          );
+          return (
+            <div key={`t${i}`} style={{background:S.card,borderRadius:12,padding:14,border:`1px solid ${C[e.type]||"#334155"}33`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:18}}>{IC[e.type]}</span><div><div style={{fontWeight:600,fontSize:13}}>{LB[e.type]}</div><div style={{fontSize:11,color:S.sub}}>{new Date(e.d+"T00:00:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"})}</div></div></div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{textAlign:"right"}}><div style={{color:C[e.type]||"white",fontWeight:700}}>{e.dist} {e.unit}</div><div style={{fontSize:11,color:S.sub}}>{e.time} min{e.type==="swim"?` · ${e.outdoor?"🌊":"🏊"}`:""}</div></div>
+                  <button onClick={()=>deleteTraining(e.d)} style={{background:"#EF444422",border:"1px solid #EF4444",borderRadius:6,padding:"4px 8px",color:"#EF4444",cursor:"pointer",fontSize:11}}>✕</button>
+                </div>
+              </div>
+            </div>
+          );
         })}
       </div>
     </div>
